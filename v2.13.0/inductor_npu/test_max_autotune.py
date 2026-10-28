@@ -2981,11 +2981,19 @@ class TestMaxAutotune(TestCase):
             ),
         ):
             compiled = torch.compile(mm_with_cat, mode="max-autotune-no-cudagraphs")
-            _, code = run_and_get_code(compiled, a, b1, b2, d)
+            result, code = run_and_get_code(compiled, a, b1, b2, d)
 
-            # Despite Triton being 10x faster in benchmarks, the layout conflict
-            # should force fallback to extern_kernels.bmm
-            FileCheck().check_not("triton_tem").run(code[0])
+            if GPU_TYPE == "npu" and not config.comprehensive_padding and epilogue:
+                # NPU keeps the unpadded B layout, so the CUDA layout conflict
+                # is absent. Check the selected template's real leading stride.
+                FileCheck().check(f"stride_bk = {n}").check_not(
+                    "stride_bk = 1536"
+                ).run(code[0])
+                self.assertEqual(result, mm_with_cat(a, b1, b2, d))
+            else:
+                # Despite Triton being 10x faster in benchmarks, the layout
+                # conflict should force fallback to extern_kernels.bmm.
+                FileCheck().check_not("triton_tem").run(code[0])
 
     @parametrize("always_freeze", [True, False])
     def test_mm_layout_freezing_behavior(self, always_freeze):
