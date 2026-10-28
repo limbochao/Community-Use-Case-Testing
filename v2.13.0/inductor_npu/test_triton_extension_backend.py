@@ -21,6 +21,7 @@ import torch
 import torch._dynamo
 import torch.utils.cpp_extension
 from torch._inductor import config
+from torch._inductor.test_case import TestCase
 
 
 try:
@@ -94,8 +95,11 @@ def mock_triton_hash_with_backend(*args, **kwargs):
     return "".join(random.choices(string.ascii_uppercase + string.digits, k=64))
 
 
+TritonTestBase = TestCase if GPU_TYPE == "npu" else BaseExtensionBackendTests
+
+
 @unittest.skipIf(IS_FBCODE, "cpp_extension doesn't work in fbcode right now")
-class TritonExtensionBackendTests(BaseExtensionBackendTests):
+class TritonExtensionBackendTests(TritonTestBase):
     """
     Test creating a backend for inductor with Triton scheduling.
     """
@@ -122,6 +126,7 @@ class TritonExtensionBackendTests(BaseExtensionBackendTests):
         # Restore the default backend.
         cls._default_backend_patch.stop()
 
+    @unittest.skipIf(GPU_TYPE == "npu", "PrivateUse1 is already registered by torch_npu")
     def test_open_device_registration(self):
         torch._register_device_module("privateuseone", self.module)
         register_backend_for_device(
