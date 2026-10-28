@@ -11,6 +11,7 @@ import torch_npu.testing
 import copy
 import importlib
 import itertools
+import functools
 import os
 import sys
 
@@ -36,6 +37,28 @@ from inductor.test_torchinductor import (  # @manual=fbcode//caffe2/test/inducto
     copy_tests,
 )
 import torch_npu._inductor
+
+
+def npu_conv_precision_on_and_off(precision):
+    def decorate(fn):
+        cuda_test = tf32_on_and_off(precision)(fn)
+
+        @functools.wraps(fn)
+        def wrapped(self, *args, **kwargs):
+            if torch.device(self.device).type != "npu":
+                return cuda_test(self, *args, **kwargs)
+            original_precision = self.precision
+            try:
+                for enabled in (False, True):
+                    self.precision = precision if enabled else original_precision
+                    with torch_npu.npu.aclnn.flags(allow_hf32=enabled):
+                        fn(self, *args, **kwargs)
+            finally:
+                self.precision = original_precision
+
+        return wrapped
+
+    return decorate
 
 
 class ConvOp(nn.Module):
@@ -104,8 +127,7 @@ class MultiUserConvOp(nn.Module):
 
 
 class EfficientConvBNEvalTemplate(TestCase):
-    @tf32_on_and_off(0.003)
-    @torch_npu.npu.aclnn.flags(allow_hf32=False)
+    @npu_conv_precision_on_and_off(0.003)
     @inductor_config.patch({"efficient_conv_bn_eval_fx_passes": True})
     def test_functional_batch_norm_defaults(self):
         class Model(torch.nn.Module):
