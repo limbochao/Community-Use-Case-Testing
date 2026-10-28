@@ -148,7 +148,7 @@ class EfficientConvBNEvalTemplate(TestCase):
         opt = torch.compile(mod, backend="inductor")
         opt(x, mean, var)
 
-    @tf32_on_and_off(0.003)
+    @npu_conv_precision_on_and_off(0.003)
     @inductor_config.patch({"efficient_conv_bn_eval_fx_passes": True})
     def test_fx_graph_batch_norm_defaults(self):
         """Regression test for issue #169011.
@@ -190,7 +190,7 @@ class EfficientConvBNEvalTemplate(TestCase):
         expected = gm(inp_tensor, mean_tensor, var_tensor)
         self.assertEqual(out, expected)
 
-    @tf32_on_and_off(0.003)
+    @npu_conv_precision_on_and_off(0.003)
     @inductor_config.patch({"efficient_conv_bn_eval_fx_passes": True})
     @functorch_config.patch({"enable_autograd_cache": False})
     def test_basic(self):
