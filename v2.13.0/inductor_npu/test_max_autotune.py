@@ -3398,10 +3398,11 @@ class TestMaxAutotune(TestCase):
         tol = 5e-2 if dtype == torch.float32 else 1e-2
         torch.testing.assert_close(out, expected, atol=tol, rtol=tol)
 
+        mm_name = "matmul" if GPU_TYPE == "npu" else "mm"
         kernel_name = (
             "triton_tem_fused_addmm_relu_sub"
             if use_addmm
-            else "triton_tem_fused_mm_relu_sub"
+            else f"triton_tem_fused_{mm_name}_relu_sub"
         )
         FileCheck().check(kernel_name).run(code[0])
 
