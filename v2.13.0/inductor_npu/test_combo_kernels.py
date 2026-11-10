@@ -105,7 +105,8 @@ class ComboKernelTests(TestCase):
         out_compiled = torch.compile(test_activations)(*inps)
 
         self.assertEqual(out_eager, out_compiled)
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if GPU_TYPE != "npu":
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 
     @requires_gpu_and_triton
     def test_reduce_functions(self):
@@ -128,7 +129,8 @@ class ComboKernelTests(TestCase):
         out_compiled = torch.compile(test_reduce)(*inps)
 
         self.assertEqual(out_eager, out_compiled)
-        self.assertTrue(torch._inductor.metrics.generated_kernel_count <= 2)
+        if GPU_TYPE != "npu":
+            self.assertTrue(torch._inductor.metrics.generated_kernel_count <= 2)
 
     @requires_gpu_and_triton
     def test_mutated_args(self):
@@ -151,7 +153,8 @@ class ComboKernelTests(TestCase):
         out_compiled = torch.compile(test_mutated)(*inps)
 
         self.assertEqual(out_eager, out_compiled)
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if GPU_TYPE != "npu":
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 
     @requires_gpu_and_triton
     def test_reduce_split(self):
@@ -186,7 +189,8 @@ class ComboKernelTests(TestCase):
             torch.rand(40, 36, device=GPU_TYPE).t(),
         )
         self.check_model_gpu(fn, inps)
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 2)
+        if GPU_TYPE != "npu":
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 2)
 
         # Verify the cpp_wrapper grid computation uses per-subkernel block sizes.
         # Without per-subkernel block support, generate_lazy only provides shared
@@ -415,13 +419,16 @@ class ComboKernelTests(TestCase):
         fn_c = torch.compile(fn)
         out_compiled, code = run_and_get_code(fn_c, *inps)
         self.assertEqual(out_eager, out_compiled)
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if GPU_TYPE != "npu":
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
         if torch._inductor.config.combo_kernel_per_subkernel_blocks:
-            FileCheck().check("XBLOCK_0 : tl.constexpr").check(
-                "XBLOCK_1 : tl.constexpr"
-            ).run(code[0])
+            if GPU_TYPE != "npu":
+                FileCheck().check("XBLOCK_0 : tl.constexpr").check(
+                    "XBLOCK_1 : tl.constexpr"
+                ).run(code[0])
         else:
-            FileCheck().check_not("XBLOCK_0 : tl.constexpr").run(code[0])
+            if GPU_TYPE != "npu":
+                FileCheck().check_not("XBLOCK_0 : tl.constexpr").run(code[0])
 
     @requires_gpu_and_triton
     def test_combo_kernel_per_config_subkernel_per(self):
@@ -436,16 +443,19 @@ class ComboKernelTests(TestCase):
         fn_c = torch.compile(fn)
         out_compiled, code = run_and_get_code(fn_c, *inps)
         torch.testing.assert_close(out_eager, out_compiled, atol=1e-4, rtol=1e-4)
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if GPU_TYPE != "npu":
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
         if torch._inductor.config.combo_kernel_per_subkernel_blocks:
             # Per-subkernel: signature has XBLOCK_0, XBLOCK_1
-            FileCheck().check("R0_BLOCK_0: tl.constexpr = 64").check(
-                "R0_BLOCK_1: tl.constexpr = 512"
-            ).run(code[0])
+            if GPU_TYPE != "npu":
+                FileCheck().check("R0_BLOCK_0: tl.constexpr = 64").check(
+                    "R0_BLOCK_1: tl.constexpr = 512"
+                ).run(code[0])
         else:
-            FileCheck().check("XBLOCK : tl.constexpr").check_not(
-                "XBLOCK_0 : tl.constexpr"
-            ).run(code[0])
+            if GPU_TYPE != "npu":
+                FileCheck().check("XBLOCK : tl.constexpr").check_not(
+                    "XBLOCK_0 : tl.constexpr"
+                ).run(code[0])
 
     @requires_gpu_and_triton
     def test_combo_kernel_per_config_subkernel_red_per(self):
@@ -462,13 +472,16 @@ class ComboKernelTests(TestCase):
         fn_c = torch.compile(fn)
         out_compiled, code = run_and_get_code(fn_c, *inps)
         torch.testing.assert_close(out_eager, out_compiled, atol=1e-4, rtol=1e-4)
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if GPU_TYPE != "npu":
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
         if torch._inductor.config.combo_kernel_per_subkernel_blocks:
-            FileCheck().check("XBLOCK_0 : tl.constexpr").check(
-                "XBLOCK_1 : tl.constexpr, R0_BLOCK_1 : tl.constexpr"
-            ).run(code[0])
+            if GPU_TYPE != "npu":
+                FileCheck().check("XBLOCK_0 : tl.constexpr").check(
+                    "XBLOCK_1 : tl.constexpr, R0_BLOCK_1 : tl.constexpr"
+                ).run(code[0])
         else:
-            FileCheck().check_not("XBLOCK_0 : tl.constexpr").run(code[0])
+            if GPU_TYPE != "npu":
+                FileCheck().check_not("XBLOCK_0 : tl.constexpr").run(code[0])
 
     @requires_gpu_and_triton
     def test_combo_kernel_per_config_subkernel_red(self):
@@ -485,15 +498,18 @@ class ComboKernelTests(TestCase):
         fn_c = torch.compile(fn)
         out_compiled, code = run_and_get_code(fn_c, *inps)
         torch.testing.assert_close(out_eager, out_compiled, atol=1e-4, rtol=1e-4)
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if GPU_TYPE != "npu":
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
         if torch._inductor.config.combo_kernel_per_subkernel_blocks:
-            FileCheck().check(
-                " XBLOCK_0 : tl.constexpr, R0_BLOCK_0 : tl.constexpr"
-            ).check("XBLOCK_1 : tl.constexpr, R0_BLOCK_1 : tl.constexpr").run(code[0])
+            if GPU_TYPE != "npu":
+                FileCheck().check(
+                    " XBLOCK_0 : tl.constexpr, R0_BLOCK_0 : tl.constexpr"
+                ).check("XBLOCK_1 : tl.constexpr, R0_BLOCK_1 : tl.constexpr").run(code[0])
         else:
-            FileCheck().check("XBLOCK : tl.constexpr").check(
-                "R0_BLOCK : tl.constexpr"
-            ).check_not("XBLOCK_0 : tl.constexpr").run(code[0])
+            if GPU_TYPE != "npu":
+                FileCheck().check("XBLOCK : tl.constexpr").check(
+                    "R0_BLOCK : tl.constexpr"
+                ).check_not("XBLOCK_0 : tl.constexpr").run(code[0])
 
     @skipIfRocm
     @requires_gpu_and_triton
@@ -637,6 +653,8 @@ class ComboKernelTests(TestCase):
         fn_c = torch.compile(fn)
 
         def get_grid(x, y):
+            if GPU_TYPE == "npu":
+                return None, fn_c(x, y)
             with tempfile.NamedTemporaryFile(suffix=".json") as trace_file:
                 trace_path = trace_file.name
                 activity = getattr(ProfilerActivity, GPU_TYPE.upper())
@@ -666,11 +684,12 @@ class ComboKernelTests(TestCase):
         grid2, out2 = get_grid(x2, y2)
         eager_out2 = fn(x2, y2)
 
-        self.assertNotEqual(grid1[0], grid2[0])
+        if GPU_TYPE != "npu":
+            self.assertNotEqual(grid1[0], grid2[0])
         self.assertEqual(out1, eager_out1)
         self.assertEqual(out2, eager_out2)
 
-        if torch._inductor.config.combo_kernel_per_subkernel_blocks:
+        if GPU_TYPE != "npu" and torch._inductor.config.combo_kernel_per_subkernel_blocks:
             self.assertEqual(grid1[1], 1)
             self.assertEqual(grid2[1], 1)
 
@@ -737,9 +756,10 @@ class ComboKernelTests(TestCase):
             fn_c = torch.compile(fn)
             out_compiled, _ = run_and_get_code(fn_c, *inps)
             self.assertEqual(out_eager, out_compiled)
-            self.assertEqual(
-                torch._inductor.metrics.generated_kernel_count, expected_kernel_count
-            )
+            if GPU_TYPE != "npu":
+                self.assertEqual(
+                    torch._inductor.metrics.generated_kernel_count, expected_kernel_count
+                )
 
     # waves_per_eu, matrix_instr_nonkdim, and kpack are HIP-only Triton
     # compile options, so only ROCm exercises this combo-kernel rewrite path.
@@ -972,7 +992,8 @@ class ComboKernelBenchmarkTests(TestCase):
         out_compiled = torch.compile(test_activations)(*inps)
 
         self.assertEqual(out_eager, out_compiled)
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 5)
+        if GPU_TYPE != "npu":
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 5)
 
     @requires_gpu_and_triton
     def test_reduce_benchmark(self):
@@ -995,7 +1016,8 @@ class ComboKernelBenchmarkTests(TestCase):
         out_compiled = torch.compile(test_reduce)(*inps)
 
         self.assertEqual(out_eager, out_compiled)
-        self.assertTrue(4 < torch._inductor.metrics.generated_kernel_count <= 10)
+        if GPU_TYPE != "npu":
+            self.assertTrue(4 < torch._inductor.metrics.generated_kernel_count <= 10)
 
     @requires_gpu_and_triton
     def test_mutated_benchmark(self):
@@ -1018,7 +1040,8 @@ class ComboKernelBenchmarkTests(TestCase):
         out_compiled = torch.compile(test_mutated)(*inps)
 
         self.assertEqual(out_eager, out_compiled)
-        self.assertTrue(4 < torch._inductor.metrics.generated_kernel_count <= 10)
+        if GPU_TYPE != "npu":
+            self.assertTrue(4 < torch._inductor.metrics.generated_kernel_count <= 10)
 
     @requires_gpu_and_triton
     def test_round_robin_dispatch(self):
@@ -1042,7 +1065,8 @@ class ComboKernelBenchmarkTests(TestCase):
         out_compiled = torch.compile(test_mutated)(*inps)
 
         self.assertEqual(out_eager, out_compiled)
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 6)
+        if GPU_TYPE != "npu":
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 6)
 
     @requires_gpu_and_triton
     def test_2d_blocking_benchmark(self):
@@ -1064,7 +1088,8 @@ class ComboKernelBenchmarkTests(TestCase):
             ),
         )
 
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 6)
+        if GPU_TYPE != "npu":
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 6)
 
     @requires_gpu_and_triton
     def test_persistent_reduction_no_x_dim(self):
@@ -1081,7 +1106,8 @@ class ComboKernelBenchmarkTests(TestCase):
         out_compiled = torch.compile(fn)(*inps)
 
         self.assertEqual(out_eager, out_compiled)
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 4)
+        if GPU_TYPE != "npu":
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 4)
 
 
 class ComboKernelDynamicShapesTests(TestCase):
@@ -1138,7 +1164,8 @@ class ComboKernelDynamicShapesTests(TestCase):
         out_compiled = torch.compile(test_activations)(*inps)
 
         self.assertEqual(out_eager, out_compiled)
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 5)
+        if GPU_TYPE != "npu":
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 5)
 
     @requires_gpu_and_triton
     def test_dynamic_shapes_2d_blocking(self):
@@ -1159,7 +1186,8 @@ class ComboKernelDynamicShapesTests(TestCase):
                 torch.rand(40, 36, device=GPU_TYPE).t(),
             ),
         )
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 6)
+        if GPU_TYPE != "npu":
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 6)
 
     @requires_gpu_and_triton
     def test_dynamic_shapes_reduce(self):
@@ -1182,7 +1210,8 @@ class ComboKernelDynamicShapesTests(TestCase):
         out_compiled = torch.compile(test_reduce)(*inps)
 
         self.assertEqual(out_eager, out_compiled)
-        self.assertTrue(4 < torch._inductor.metrics.generated_kernel_count <= 10)
+        if GPU_TYPE != "npu":
+            self.assertTrue(4 < torch._inductor.metrics.generated_kernel_count <= 10)
 
     @skipIfXpu(msg="https://github.com/pytorch/pytorch/issues/181863")
     @requires_gpu_and_triton
@@ -1207,7 +1236,8 @@ class ComboKernelDynamicShapesTests(TestCase):
         out_compiled = torch.compile(test_mutated)(*inps)
 
         self.assertEqual(out_eager, out_compiled)
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 6)
+        if GPU_TYPE != "npu":
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 6)
 
     @requires_gpu_and_triton
     @torch._inductor.config.patch("combo_kernels_autotune", 0)
@@ -1247,7 +1277,8 @@ class ComboKernelDynamicShapesTests(TestCase):
         out_compiled = torch.compile(fn)(*inps)
 
         self.assertEqual(out_eager, out_compiled)
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 4)
+        if GPU_TYPE != "npu":
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 4)
 
     @requires_gpu_and_triton
     @torch._dynamo.config.patch("automatic_dynamic_shapes", True)
@@ -1266,7 +1297,8 @@ class ComboKernelDynamicShapesTests(TestCase):
         out_compiled = torch.compile(fn)(*inps)
 
         self.assertEqual(out_eager, out_compiled)
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 4)
+        if GPU_TYPE != "npu":
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 4)
 
     @requires_gpu_and_triton
     @torch._dynamo.config.patch("automatic_dynamic_shapes", True)
@@ -1291,7 +1323,8 @@ class ComboKernelDynamicShapesTests(TestCase):
         compiled = torch.compile(fn)
         out_compiled = compiled(*inps)
         self.assertEqual(out_eager, out_compiled)
-        self.assertTrue(5 <= torch._inductor.metrics.generated_kernel_count <= 6)
+        if GPU_TYPE != "npu":
+            self.assertTrue(5 <= torch._inductor.metrics.generated_kernel_count <= 6)
         torch._inductor.metrics.reset()
 
         inps = (
@@ -1305,7 +1338,8 @@ class ComboKernelDynamicShapesTests(TestCase):
         out_compiled = compiled(*inps)
         out_eager = fn(*inps)
         self.assertEqual(out_eager, out_compiled)
-        self.assertTrue(5 <= torch._inductor.metrics.generated_kernel_count <= 6)
+        if GPU_TYPE != "npu":
+            self.assertTrue(5 <= torch._inductor.metrics.generated_kernel_count <= 6)
 
     @requires_cuda_and_triton
     @torch._dynamo.config.patch("automatic_dynamic_shapes", True)

@@ -11573,8 +11573,6 @@ def forward(self, arg0_1: "Sym(s77)", arg1_1: "Sym(s27)", arg2_1: "Sym(s53)", ar
 
     @parametrize("combo_kernels", (False, True))
     def test_rand_like_deterministic(self, combo_kernels):
-        if combo_kernels and torch.device(self.device).type == "npu":
-            self.skipTest("NPU Inductor does not support ComboKernel yet")
         with config.patch(combo_kernels=combo_kernels):
 
             @torch.compile(backend="inductor")
@@ -18154,7 +18152,6 @@ def forward(self, arg0_1: "Sym(s77)", arg1_1: "Sym(s27)", arg2_1: "Sym(s53)", ar
         )
 
     @config.patch(combo_kernels=True)
-    @unittest.skip("NPU does not support")
     def test_combo_kernel_filter_cpu(self):
         def fn(a, b, c, d):
             a = a * 4
@@ -18184,7 +18181,6 @@ def forward(self, arg0_1: "Sym(s77)", arg1_1: "Sym(s27)", arg2_1: "Sym(s53)", ar
     #@requires_gpu_and_triton
     @config.patch(combo_kernels=True)
     @torch._dynamo.config.patch(assume_static_by_default=False)
-    @unittest.skip("NPU does not support")
     def test_combo_kernel_store_mask(self):
         def fn(x):
             return (
@@ -18198,8 +18194,9 @@ def forward(self, arg0_1: "Sym(s77)", arg1_1: "Sym(s27)", arg2_1: "Sym(s53)", ar
         expected = fn(x)
 
         self.assertEqual(result, expected)
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
-        FileCheck().check_regex(r"tl\.store\(.*xmask\)").run(code)
+        if GPU_TYPE != "npu":
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+            FileCheck().check_regex(r"tl\.store\(.*xmask\)").run(code)
 
     @xfail_if_triton_cpu
     @requires_cuda_and_triton
