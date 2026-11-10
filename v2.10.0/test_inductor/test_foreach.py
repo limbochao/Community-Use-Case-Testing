@@ -221,7 +221,9 @@ def gen_args(op):
 class ForeachTests(TestCase):
     check_model_gpu = check_model_gpu
     check_model_cpu = check_model
-    check_kernel_count = True
+    # NPU validates foreach numerics here; its native foreach fusion path is not enabled.
+    # Keep the original kernel-count checks for other backends.
+    check_kernel_count = GPU_TYPE != "npu"
 
     def setUp(self):
         super().setUp()
@@ -288,19 +290,22 @@ class ForeachTests(TestCase):
     @all_ops
     def test_single_list(self, op):
         self._test_single_list(op)
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 
     @requires_gpu
     @scalar_bin_ops
     def test_single_scalar(self, op):
         self._test_single_scalar(op)
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 
     @requires_gpu
     @scalar_tensor_bin_ops
     def test_single_scalar_tensor(self, op):
         self._test_single_scalar_tensor(op)
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 
     @requires_gpu
     @all_ops
@@ -328,7 +333,8 @@ class ForeachTests(TestCase):
             gen_args(op),
         )
 
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 
     @requires_gpu
     @scalar_bin_ops
@@ -345,7 +351,8 @@ class ForeachTests(TestCase):
             ),
         )
 
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 
     @requires_gpu
     @scalar_bin_ops
@@ -364,7 +371,8 @@ class ForeachTests(TestCase):
         actual = fn_opt(*inputs)
         expected = fn(*inputs)
         self.assertEqual(actual, expected)
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 
     @requires_gpu
     @all_ops
@@ -422,7 +430,8 @@ class ForeachTests(TestCase):
         actual = fn_opt(*inputs)
         expected = fn(*inputs)
         self.assertEqual(actual, expected)
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 
     @requires_gpu
     @scalar_bin_ops
@@ -444,7 +453,8 @@ class ForeachTests(TestCase):
         actual = fn_opt(*inputs)
         expected = fn(*inputs)
         self.assertEqual(actual, expected)
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 2)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 2)
 
     @requires_gpu
     @scalar_bin_ops
@@ -488,7 +498,8 @@ class ForeachTests(TestCase):
         kernel_count = 1
         if "foreach_map" in op.__name__:
             kernel_count = 2
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, kernel_count)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, kernel_count)
 
     @requires_gpu
     @all_ops
@@ -563,7 +574,8 @@ class ForeachTests(TestCase):
             fn, gen_args(op), reference_in_float=False, check_lowp=False
         )
 
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 
     @requires_gpu
     @scalar_bin_ops
@@ -583,7 +595,8 @@ class ForeachTests(TestCase):
             ),
         )
 
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 
     @requires_gpu
     @all_ops
@@ -625,7 +638,8 @@ class ForeachTests(TestCase):
             check_lowp=False,
         )
 
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 
     @requires_gpu
     @scalar_bin_ops
@@ -650,7 +664,8 @@ class ForeachTests(TestCase):
             check_lowp=False,
         )
 
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 
     @requires_gpu
     @bin_ops
@@ -689,7 +704,8 @@ class ForeachTests(TestCase):
 
         self.check_model_gpu(fn, inputs)
 
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 
     @requires_gpu
     @torch._dynamo.config.patch("automatic_dynamic_shapes", False)
@@ -749,7 +765,8 @@ class ForeachTests(TestCase):
             ),
         )
 
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 
     @requires_gpu
     def test_fuse_concat(self):
@@ -772,7 +789,8 @@ class ForeachTests(TestCase):
 
         self.check_model_gpu(fn, args)
 
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 2)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 2)
 
     @requires_gpu
     def test_zero_elems(self):
@@ -807,7 +825,8 @@ class ForeachTests(TestCase):
             ),
         )
 
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 
     @requires_gpu
     @bin_ops
@@ -847,7 +866,8 @@ class ForeachTests(TestCase):
             ),
         )
 
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 2)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 2)
 
     @requires_gpu
     @bin_ops
@@ -870,7 +890,8 @@ class ForeachTests(TestCase):
             ),
         )
 
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 
     @requires_gpu
     @inplace_bin_ops
@@ -888,7 +909,8 @@ class ForeachTests(TestCase):
 
         self.check_model_gpu(fn, inputs, check_lowp=False)
 
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 
     @requires_gpu
     @inplace_bin_ops
@@ -907,7 +929,8 @@ class ForeachTests(TestCase):
 
         self.check_model_gpu(fn, inputs, check_lowp=False)
 
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 
     @requires_gpu
     @inplace_bin_ops
@@ -926,7 +949,8 @@ class ForeachTests(TestCase):
 
         self.check_model_gpu(fn, inputs, check_lowp=False)
 
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 
     @requires_gpu
     def test_multi_device(self):
@@ -966,7 +990,8 @@ class ForeachTests(TestCase):
         out_compiled = torch.compile(test_foreach_add)(*inps)
 
         self.assertEqual(out_eager, out_compiled)
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 4)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 4)
 
     @requires_gpu
     @torch._inductor.config.patch("combo_kernel_allow_mixed_sizes", 1)
@@ -988,7 +1013,8 @@ class ForeachTests(TestCase):
             ),
         )
 
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 2)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 2)
 
     @requires_gpu
     @torch._inductor.config.patch("combo_kernel_allow_mixed_sizes", 2)
@@ -1010,7 +1036,8 @@ class ForeachTests(TestCase):
             ),
         )
 
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 
     @requires_gpu
     @foreach_map_bin_ops
@@ -1022,7 +1049,7 @@ class ForeachTests(TestCase):
             return outs[0].sum() + outs[1].sum() + outs[2].sum()
 
         def ref_fn(xs, ys):
-            outs = foreach_map_fn(torch.add, xs, ys)
+            outs = foreach_map_fn(op.original_op, xs, ys)
             return outs[0].sum() + outs[1].sum() + outs[2].sum()
 
         ref_inps = (
@@ -1049,9 +1076,10 @@ class ForeachTests(TestCase):
         _, (_, _) = run_fw_bw_and_get_code(lambda: torch.compile(fn)(*inps))
 
         for ref, act in zip(tree_flatten(ref_inps)[0], tree_flatten(inps)[0]):
-            torch.allclose(ref.grad, act.grad)
+            self.assertTrue(torch.allclose(ref.grad, act.grad))
 
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 5)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 5)
 
     @requires_gpu
     def test_foreach_map_input_mutation(self):
@@ -1117,9 +1145,10 @@ class ForeachTests(TestCase):
         _, (_, _) = run_fw_bw_and_get_code(lambda: torch.compile(fn)(inp))
 
         for ref, act in zip(ref_inp, inp):
-            torch.allclose(ref.grad, act.grad)
+            self.assertTrue(torch.allclose(ref.grad, act.grad))
 
-        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 5)
+        if self.check_kernel_count:
+            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 5)
 
 
 if __name__ == "__main__":
