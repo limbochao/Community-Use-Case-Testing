@@ -3,6 +3,8 @@ import torch_npu
 from torch_npu.contrib import transfer_to_npu
 from torch_npu.utils import _dynamo
 _dynamo.use_jit_script = True
+# transfer_to_npu disables Triton discovery; restore it before importing test gates.
+_dynamo.patch_has_triton()
 torch.cuda.get_device_capability = lambda :(10, 0)
 import torch_npu.testing
 
@@ -89,6 +91,7 @@ from torch.testing._internal.common_cuda import (
 )
 from torch.testing._internal.common_device_type import (
     expectedFailureXPU,
+    get_desired_device_type_test_bases,
     largeTensorTest,
 )
 from torch.testing._internal.common_dtype import all_types, get_all_dtypes
@@ -155,6 +158,15 @@ from torch.testing._internal.triton_utils import (
     requires_gpu_and_triton,
 )
 import torch_npu._inductor
+
+
+# RUN_GPU is computed before the NPU backend adds its device type to GPU_TYPES.
+# Respect device selection while allowing the NPU CommonTemplate tests to be generated.
+if GPU_TYPE == "npu" and HAS_GPU:
+    RUN_GPU = any(
+        getattr(base, "device_type", "") in ("npu", "privateuse1")
+        for base in get_desired_device_type_test_bases(allow_xpu=True)
+    )
 
 
 _T = TypeVar("_T")
