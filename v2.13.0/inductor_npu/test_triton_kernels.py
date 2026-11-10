@@ -3,6 +3,8 @@ import torch_npu
 from torch_npu.contrib import transfer_to_npu
 from torch_npu.utils import _dynamo
 _dynamo.use_jit_script = True
+# Restore discovery before torch_npu.testing imports the shared test gates.
+_dynamo.patch_has_triton()
 torch.cuda.get_device_capability = lambda :(10, 0)
 import torch_npu.testing
 import torch_npu._inductor
