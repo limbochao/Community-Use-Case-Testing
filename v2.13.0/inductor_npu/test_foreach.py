@@ -2,6 +2,7 @@ import torch
 import torch_npu
 from torch_npu.contrib import transfer_to_npu
 from torch_npu.utils import _dynamo
+_dynamo.patch_has_triton()
 
 from functools import wraps
 
