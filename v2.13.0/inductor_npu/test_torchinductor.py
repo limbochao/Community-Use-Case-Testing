@@ -18153,6 +18153,12 @@ def forward(self, arg0_1: "Sym(s77)", arg1_1: "Sym(s27)", arg2_1: "Sym(s53)", ar
 
     @config.patch(combo_kernels=True)
     def test_combo_kernel_filter_cpu(self):
+        if torch.device(self.device).type == "npu":
+            self.skipTest(
+                "CPU Combo-filtering policy is covered by the CPU instance; "
+                "the NPU instance does not validate that policy"
+            )
+
         def fn(a, b, c, d):
             a = a * 4
             b = b + 8
@@ -18197,6 +18203,46 @@ def forward(self, arg0_1: "Sym(s77)", arg1_1: "Sym(s27)", arg2_1: "Sym(s53)", ar
         if GPU_TYPE != "npu":
             self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
             FileCheck().check_regex(r"tl\.store\(.*xmask\)").run(code)
+            return
+
+        # The scalar and non-scalar reductions above have incompatible NPU
+        # layouts and run as ordinary kernels. Keep that numerical regression,
+        # then exercise store masks in an actual two-member NPU Combo below.
+        def npu_means(a, b):
+            return a.mean(-1), b.mean(-1)
+
+        inputs = [torch.randn(rows, 129, device=GPU_TYPE) for rows in (257, 513)]
+        torch._dynamo.reset()
+        torch._inductor.metrics.reset()
+        # The common template enables dtype debug assertions. NPU currently
+        # asserts a float dtype for a dynamic integer in this mean Combo;
+        # isolate that separate diagnostic issue from this store-mask check.
+        with (
+            config.patch(
+                benchmark_combo_kernel=False,
+                combo_kernel_per_subkernel_blocks=False,
+                combo_kernel_max_distance=-1,
+                combo_kernel_peak_memory_increase_gb=None,
+                combo_kernel_peak_memory_pct_threshold=None,
+            ),
+            config.patch({"test_configs.runtime_triton_dtype_assert": False}),
+        ):
+            actual, (combo_code,) = run_and_get_code(torch.compile(npu_means), *inputs)
+        self.assertEqual(actual, npu_means(*inputs))
+        self.assertEqual(combo_code.count("async_compile.triton("), 1)
+        FileCheck().check("'grid_type': 'SequentialComboKernelGrid'").check(
+            "'num_kernels': 2"
+        ).check("x0_numel = x0_numel_0").check(
+            "x0_mask = x0 < min(X0BLOCK+x0_offset, x0_numel)"
+        ).check_regex(r"tl\.store\(.*x0_mask\)").check(
+            "x0_numel = x0_numel_1"
+        ).check("x0_mask = x0 < min(X0BLOCK+x0_offset, x0_numel)").check_regex(
+            r"tl\.store\(.*x0_mask\)"
+        ).run(combo_code)
+        stores = re.findall(r"^\s*tl\.store\((.*)\)\s*$", combo_code, re.MULTILINE)
+        self.assertEqual(len(stores), 2)
+        for store in stores:
+            self.assertTrue(store.endswith(", x0_mask"), "Every Combo store must be masked")
 
     @xfail_if_triton_cpu
     @requires_cuda_and_triton

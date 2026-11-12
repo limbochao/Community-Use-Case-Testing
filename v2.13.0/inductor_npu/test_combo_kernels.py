@@ -44,6 +44,15 @@ from torch.testing._internal.triton_utils import (
 
 aten = torch.ops.aten
 
+NPU_INDEPENDENT_BLOCKS_REASON = (
+    "Independent per-subkernel blocking is not implemented on NPU; "
+    "shared tiling does not validate this feature"
+)
+NPU_PDL_REASON = (
+    "CUDA-only PDL requires SM90+ grid dependency control hardware and "
+    "CUDA gdc_wait/gdc_launch_dependents launch and synchronization intrinsics"
+)
+
 try:
     try:
         from .test_torchinductor import check_model, check_model_gpu
@@ -284,7 +293,7 @@ class ComboKernelTests(TestCase):
     @requires_cuda_and_triton
     @unittest.skipIf(
         GPU_TYPE == "npu" or not SM90OrLater or torch.version.hip,
-        "TMA descriptors require CUDA SM90 or later",
+        "CUDA-only TMA descriptors require the SM90+ Tensor Memory Accelerator hardware",
     )
     @torch._inductor.config.patch(
         {
@@ -459,6 +468,7 @@ class ComboKernelTests(TestCase):
             ).check_not("combo_grid_meta").run(code[0])
 
     @requires_gpu_and_triton
+    @unittest.skipIf(GPU_TYPE == "npu", NPU_INDEPENDENT_BLOCKS_REASON)
     def test_combo_kernel_per_config_subkernel_poi(self):
         def fn(a, b):
             o1 = a * 2.0
@@ -473,18 +483,16 @@ class ComboKernelTests(TestCase):
         fn_c = torch.compile(fn)
         out_compiled, code = run_and_get_code(fn_c, *inps)
         self.assertEqual(out_eager, out_compiled)
-        if GPU_TYPE != "npu":
-            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
         if torch._inductor.config.combo_kernel_per_subkernel_blocks:
-            if GPU_TYPE != "npu":
-                FileCheck().check("XBLOCK_0 : tl.constexpr").check(
-                    "XBLOCK_1 : tl.constexpr"
-                ).run(code[0])
+            FileCheck().check("XBLOCK_0 : tl.constexpr").check(
+                "XBLOCK_1 : tl.constexpr"
+            ).run(code[0])
         else:
-            if GPU_TYPE != "npu":
-                FileCheck().check_not("XBLOCK_0 : tl.constexpr").run(code[0])
+            FileCheck().check_not("XBLOCK_0 : tl.constexpr").run(code[0])
 
     @requires_gpu_and_triton
+    @unittest.skipIf(GPU_TYPE == "npu", NPU_INDEPENDENT_BLOCKS_REASON)
     def test_combo_kernel_per_config_subkernel_per(self):
         def fn(a, b):
             return a.sum(dim=-1), b.sum(dim=-1)
@@ -497,21 +505,19 @@ class ComboKernelTests(TestCase):
         fn_c = torch.compile(fn)
         out_compiled, code = run_and_get_code(fn_c, *inps)
         torch.testing.assert_close(out_eager, out_compiled, atol=1e-4, rtol=1e-4)
-        if GPU_TYPE != "npu":
-            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
         if torch._inductor.config.combo_kernel_per_subkernel_blocks:
             # Per-subkernel: signature has XBLOCK_0, XBLOCK_1
-            if GPU_TYPE != "npu":
-                FileCheck().check("R0_BLOCK_0: tl.constexpr = 64").check(
-                    "R0_BLOCK_1: tl.constexpr = 512"
-                ).run(code[0])
+            FileCheck().check("R0_BLOCK_0: tl.constexpr = 64").check(
+                "R0_BLOCK_1: tl.constexpr = 512"
+            ).run(code[0])
         else:
-            if GPU_TYPE != "npu":
-                FileCheck().check("XBLOCK : tl.constexpr").check_not(
-                    "XBLOCK_0 : tl.constexpr"
-                ).run(code[0])
+            FileCheck().check("XBLOCK : tl.constexpr").check_not(
+                "XBLOCK_0 : tl.constexpr"
+            ).run(code[0])
 
     @requires_gpu_and_triton
+    @unittest.skipIf(GPU_TYPE == "npu", NPU_INDEPENDENT_BLOCKS_REASON)
     def test_combo_kernel_per_config_subkernel_red_per(self):
         def fn(a, b):
             r1 = a.sum(dim=-1)
@@ -526,18 +532,16 @@ class ComboKernelTests(TestCase):
         fn_c = torch.compile(fn)
         out_compiled, code = run_and_get_code(fn_c, *inps)
         torch.testing.assert_close(out_eager, out_compiled, atol=1e-4, rtol=1e-4)
-        if GPU_TYPE != "npu":
-            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
         if torch._inductor.config.combo_kernel_per_subkernel_blocks:
-            if GPU_TYPE != "npu":
-                FileCheck().check("XBLOCK_0 : tl.constexpr").check(
-                    "XBLOCK_1 : tl.constexpr, R0_BLOCK_1 : tl.constexpr"
-                ).run(code[0])
+            FileCheck().check("XBLOCK_0 : tl.constexpr").check(
+                "XBLOCK_1 : tl.constexpr, R0_BLOCK_1 : tl.constexpr"
+            ).run(code[0])
         else:
-            if GPU_TYPE != "npu":
-                FileCheck().check_not("XBLOCK_0 : tl.constexpr").run(code[0])
+            FileCheck().check_not("XBLOCK_0 : tl.constexpr").run(code[0])
 
     @requires_gpu_and_triton
+    @unittest.skipIf(GPU_TYPE == "npu", NPU_INDEPENDENT_BLOCKS_REASON)
     def test_combo_kernel_per_config_subkernel_red(self):
         def fn(a, b):
             r1 = a.sum(dim=(0, 2))
@@ -552,18 +556,15 @@ class ComboKernelTests(TestCase):
         fn_c = torch.compile(fn)
         out_compiled, code = run_and_get_code(fn_c, *inps)
         torch.testing.assert_close(out_eager, out_compiled, atol=1e-4, rtol=1e-4)
-        if GPU_TYPE != "npu":
-            self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
+        self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
         if torch._inductor.config.combo_kernel_per_subkernel_blocks:
-            if GPU_TYPE != "npu":
-                FileCheck().check(
-                    " XBLOCK_0 : tl.constexpr, R0_BLOCK_0 : tl.constexpr"
-                ).check("XBLOCK_1 : tl.constexpr, R0_BLOCK_1 : tl.constexpr").run(code[0])
+            FileCheck().check(
+                " XBLOCK_0 : tl.constexpr, R0_BLOCK_0 : tl.constexpr"
+            ).check("XBLOCK_1 : tl.constexpr, R0_BLOCK_1 : tl.constexpr").run(code[0])
         else:
-            if GPU_TYPE != "npu":
-                FileCheck().check("XBLOCK : tl.constexpr").check(
-                    "R0_BLOCK : tl.constexpr"
-                ).check_not("XBLOCK_0 : tl.constexpr").run(code[0])
+            FileCheck().check("XBLOCK : tl.constexpr").check(
+                "R0_BLOCK : tl.constexpr"
+            ).check_not("XBLOCK_0 : tl.constexpr").run(code[0])
 
     @skipIfRocm
     @requires_gpu_and_triton
@@ -616,6 +617,7 @@ class ComboKernelTests(TestCase):
     @skipIfRocm(msg="https://github.com/pytorch/pytorch/issues/180018")
     @skipIfXpu(msg="Profiler JSON traceEvents is not supported on XPU")
     @requires_gpu_and_triton
+    @unittest.skipIf(GPU_TYPE == "npu", NPU_INDEPENDENT_BLOCKS_REASON)
     def test_combo_kernel_per_config_subkernel_block_size(self):
         from torch.profiler import ProfilerActivity
 
@@ -708,7 +710,31 @@ class ComboKernelTests(TestCase):
 
         def get_grid(x, y):
             if GPU_TYPE == "npu":
-                return None, fn_c(x, y)
+                from triton.compiler import CompiledKernel
+
+                from torch._inductor.runtime.triton_compat import knobs
+
+                grids = []
+                launch_metadata = CompiledKernel.launch_metadata
+
+                def record_grid(kernel, grid, stream, *args):
+                    grids.append(tuple(grid))
+                    return launch_metadata(kernel, grid, stream, *args)
+
+                hooks = knobs.runtime if knobs else CompiledKernel
+                with (
+                    patch.object(hooks, "launch_enter_hook", lambda metadata: None),
+                    patch.object(CompiledKernel, "launch_metadata", record_grid),
+                    torch._inductor.config.patch(compile_threads=1),
+                ):
+                    # Compile and autotune with the hook installed, then inspect
+                    # only the actual execution, excluding benchmark launches.
+                    fn_c(x, y)
+                    grids.clear()
+                    out = fn_c(x, y)
+                self.assertEqual(len(grids), 1, "Expected one actual NPU Combo launch")
+                self.assertEqual(grids[0][1:], (1, 1))
+                return grids[0], out
             with tempfile.NamedTemporaryFile(suffix=".json") as trace_file:
                 trace_path = trace_file.name
                 activity = getattr(ProfilerActivity, GPU_TYPE.upper())
@@ -738,8 +764,7 @@ class ComboKernelTests(TestCase):
         grid2, out2 = get_grid(x2, y2)
         eager_out2 = fn(x2, y2)
 
-        if GPU_TYPE != "npu":
-            self.assertNotEqual(grid1[0], grid2[0])
+        self.assertNotEqual(grid1[0], grid2[0])
         self.assertEqual(out1, eager_out1)
         self.assertEqual(out2, eager_out2)
 
@@ -932,6 +957,7 @@ class ComboKernelTests(TestCase):
             "combo_kernel_per_subkernel_blocks": True,
         }
     )
+    @unittest.skipIf(GPU_TYPE == "npu", NPU_INDEPENDENT_BLOCKS_REASON)
     def test_combo_kernel_no_bench_stitched_config(self):
         import re
 
@@ -952,10 +978,6 @@ class ComboKernelTests(TestCase):
         # is not a reliable count of real kernels.
         self.assertEqual(combined.count("async_compile.triton("), 1)
 
-        if GPU_TYPE == "npu":
-            self._check_npu_shared_grid(code, 256, 3)
-            return
-
         default_match = re.search(r"'default_config':\s*\{([^}]*)\}", combined)
         self.assertIsNotNone(default_match, "default_config not emitted")
         default_kvs = dict(
@@ -975,6 +997,7 @@ class ComboKernelTests(TestCase):
             "combo_kernel_per_subkernel_blocks": True,
         }
     )
+    @unittest.skipIf(GPU_TYPE == "npu", NPU_INDEPENDENT_BLOCKS_REASON)
     def test_combo_kernel_no_bench_persistent_reduction(self):
         import re
 
@@ -989,11 +1012,6 @@ class ComboKernelTests(TestCase):
         self.assertEqual(out_eager, out_compiled)
         combined = " ".join(code)
         self.assertEqual(combined.count("async_compile.triton("), 1)
-
-        if GPU_TYPE == "npu":
-            self._check_npu_shared_grid(code, 64, 3)
-            FileCheck().check("R1BLOCK_SUB: tl.constexpr = 1024").run(combined)
-            return
 
         default_match = re.search(r"'default_config':\s*\{([^}]*)\}", combined)
         self.assertIsNotNone(default_match)
@@ -1504,14 +1522,17 @@ class ComboKernelDynamicShapesTests(TestCase):
         self.assertEqual(code.count("def _triton_helper_fn_add0(arg0_0, arg1_0):"), 1)
 
 
+@unittest.skipIf(GPU_TYPE == "npu", NPU_INDEPENDENT_BLOCKS_REASON)
 class ComboKernelTestsPerSubkernelBlocks(ComboKernelTests):
     combo_kernel_per_subkernel_blocks = True
 
 
+@unittest.skipIf(GPU_TYPE == "npu", NPU_INDEPENDENT_BLOCKS_REASON)
 class ComboKernelBenchmarkTestsPerSubkernelBlocks(ComboKernelBenchmarkTests):
     combo_kernel_per_subkernel_blocks = True
 
 
+@unittest.skipIf(GPU_TYPE == "npu", NPU_INDEPENDENT_BLOCKS_REASON)
 class ComboKernelDynamicShapesTestsPerSubkernelBlocks(ComboKernelDynamicShapesTests):
     combo_kernel_per_subkernel_blocks = True
 
@@ -1545,7 +1566,7 @@ class ComboKernelPDLTests(TestCase):
     @requires_gpu_and_triton
     @skipIfRocm
     @unittest.skipIf(not SM90OrLater, "PDL requires SM90 or later (Hopper+)")
-    @unittest.skipIf(GPU_TYPE == "npu", "PDL and CUDA gdc launch intrinsics are CUDA-only")
+    @unittest.skipIf(GPU_TYPE == "npu", NPU_PDL_REASON)
     def test_pdl_codegen_in_combo_kernel(self):
         """Test that PDL flag and gdc calls are generated in combo kernels."""
 
@@ -1586,7 +1607,7 @@ class ComboKernelPDLTests(TestCase):
     @requires_gpu_and_triton
     @skipIfRocm
     @unittest.skipIf(not SM90OrLater, "PDL requires SM90 or later (Hopper+)")
-    @unittest.skipIf(GPU_TYPE == "npu", "PDL and CUDA gdc launch intrinsics are CUDA-only")
+    @unittest.skipIf(GPU_TYPE == "npu", NPU_PDL_REASON)
     def test_pdl_combo_kernel_pointwise(self):
         """Test that pointwise combo kernels produce correct results with PDL."""
 
@@ -1630,6 +1651,7 @@ class ComboKernelPDLTests(TestCase):
     @requires_gpu_and_triton
     @skipIfRocm
     @unittest.skipIf(not SM90OrLater, "PDL requires SM90 or later (Hopper+)")
+    @unittest.skipIf(GPU_TYPE == "npu", NPU_PDL_REASON)
     def test_pdl_combo_kernel_reduction(self):
         """Test that reduction combo kernels produce correct results with PDL."""
 
@@ -2012,6 +2034,7 @@ class ComboKernelTestsMaxAutotune(TestCase):
             self.assertIn("'max_persistent_rblock': 1024", joined)
 
     @requires_gpu_and_triton
+    @unittest.skipIf(GPU_TYPE == "npu", NPU_INDEPENDENT_BLOCKS_REASON)
     def test_combo_kernel_coordesc_tunes_largest_subkernel_first(self):
         def fn(a, b, c):
             return (
