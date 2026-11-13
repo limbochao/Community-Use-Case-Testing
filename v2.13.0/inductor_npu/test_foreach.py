@@ -2,6 +2,7 @@ import torch
 import torch_npu
 from torch_npu.contrib import transfer_to_npu
 from torch_npu.utils import _dynamo
+_dynamo.patch_has_triton()
 
 from functools import wraps
 
@@ -340,32 +341,24 @@ class ForeachTests(TestCase):
     @requires_gpu
     @all_ops
     def test_single_list(self, op):
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         self._test_single_list(op)
         self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 
     @requires_gpu
     @scalar_bin_ops
     def test_single_scalar(self, op):
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         self._test_single_scalar(op)
         self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 
     @requires_gpu
     @scalar_tensor_bin_ops
     def test_single_scalar_tensor(self, op):
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         self._test_single_scalar_tensor(op)
         self.assertEqual(torch._inductor.metrics.generated_kernel_count, 1)
 
     @requires_gpu
     @all_ops
     def test_scheduler_fusion_list(self, op):
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         if op in un_ops_under_test:
 
             def fn(a0, a1):
@@ -394,8 +387,6 @@ class ForeachTests(TestCase):
     @requires_gpu
     @scalar_bin_ops
     def test_scheduler_fusion_scalar(self, op):
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         def fn(a0, a1):
             c = op([a0, a1], 3.4)
             return c, torch._foreach_add([a0, a1], c)
@@ -413,8 +404,6 @@ class ForeachTests(TestCase):
     @requires_gpu
     @scalar_bin_ops
     def test_broadcasting(self, op):
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         def fn(a0, a1, b0, b1):
             return op([a0, a1], [b0, b1])
 
@@ -471,8 +460,6 @@ class ForeachTests(TestCase):
     @requires_gpu
     @bin_ops
     def test_type_promotion(self, op):
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         def fn(a0, a1, b0, b1):
             return op([a0, a1], [b0, b1])
 
@@ -496,8 +483,6 @@ class ForeachTests(TestCase):
     def test_kernel_split_arg_limit_list(self, op):
         # NB: foeach_copy won't pass this test because it will dce one set of buffers
 
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         def fn(a, b):
             return op(a, b)
 
@@ -538,8 +523,6 @@ class ForeachTests(TestCase):
     @requires_gpu
     @bin_ops
     def test_fusion_duplicate_buffer_list(self, op):
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         def fn(a0, a1, b0, b1):
             c = op([a0, a1], [b0, b1])
             return op([a0, b0], [c[0], c[0]])
@@ -609,8 +592,6 @@ class ForeachTests(TestCase):
     @requires_gpu
     @all_ops
     def test_non_foreach_producer_list(self, op):
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         if op in un_ops_under_test:
 
             def fn(a0, a1):
@@ -641,8 +622,6 @@ class ForeachTests(TestCase):
     @requires_gpu
     @scalar_bin_ops
     def test_non_foreach_producer_scalar(self, op):
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         def fn(a0, a1, b0, b1):
             c0 = torch.mul(a0, b0)
             c1 = torch.mul(a1, b1)
@@ -663,8 +642,6 @@ class ForeachTests(TestCase):
     @requires_gpu
     @all_ops
     def test_non_foreach_consumer_producer_list(self, op):
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         if op in un_ops_under_test:
 
             def fn(a0, a1):
@@ -707,8 +684,6 @@ class ForeachTests(TestCase):
     @requires_gpu
     @scalar_bin_ops
     def test_non_foreach_consumer_producer_scalar(self, op):
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         def fn(a0, a1, b0, b1):
             c0 = torch.add(a0, b0)
             c1 = torch.add(a1, b1)
@@ -756,8 +731,6 @@ class ForeachTests(TestCase):
     @torch._dynamo.config.patch("assume_static_by_default", False)
     @torch._inductor.config.patch("combo_kernel_foreach_dynamic_shapes", True)
     def test_enable_dynamic_shapes_python_wrapper(self, op=torch._foreach_add):
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         def fn(a0, a1, b0, b1):
             return op([a0, a1], [b0, b1])
 
@@ -815,8 +788,6 @@ class ForeachTests(TestCase):
     @requires_gpu
     @decomp_ops
     def test_decomp(self, op):
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         def fn(a0, a1, b0, b1, c0, c1):
             return op([a0, a1], [b0, b1], [c0, c1], value=0.5)
 
@@ -836,8 +807,6 @@ class ForeachTests(TestCase):
 
     @requires_gpu
     def test_fuse_concat(self):
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         def fn(x1, x2, x3, w1, w2, w3):
             x = torch.stack([x1, x2, x3])
             w = torch.stack([w1, w2, w3])
@@ -879,8 +848,6 @@ class ForeachTests(TestCase):
     @requires_gpu
     @bin_ops
     def test_2d_blocking(self, op):
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         def fn(a0, a1, b0, b1):
             return op([a0, a1], [b0, b1])
 
@@ -919,8 +886,6 @@ class ForeachTests(TestCase):
     def test_2d_blocking_partitioning_elems(self, op):
         """2D blocking should be grouped by number of yelems"""
 
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         def fn(a0, a1, a2, b0, b1, b2):
             return op([a0, a1, a2], [b0, b1, b2])
 
@@ -944,8 +909,6 @@ class ForeachTests(TestCase):
     def test_2d_blocking_partitioning_mixed_sizes(self, op):
         """2D blocking with mixed sizes should group together"""
 
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         def fn(a0, a1, a2, b0, b1, b2):
             return op([a0, a1, a2], [b0, b1, b2])
 
@@ -966,8 +929,6 @@ class ForeachTests(TestCase):
     @requires_gpu
     @inplace_bin_ops
     def test_reinplacing(self, op):
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         def fn(a0, a1, b0, b1):
             op([a0, a1], [b0, b1])
             return [a0, a1]
@@ -986,8 +947,6 @@ class ForeachTests(TestCase):
     @requires_gpu
     @inplace_bin_ops
     def test_reinplacing_mut_before(self, op):
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         def fn(a0, a1, b0, b1):
             a0.add_(torch.ones(10, 10, device=GPU_TYPE))
             op([a0, a1], [b0, b1])
@@ -1007,8 +966,6 @@ class ForeachTests(TestCase):
     @requires_gpu
     @inplace_bin_ops
     def test_reinplacing_mut_after(self, op):
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         def fn(a0, a1, b0, b1):
             op([a0, a1], [b0, b1])
             a0.add_(torch.ones(10, 10, device=GPU_TYPE))
@@ -1045,8 +1002,6 @@ class ForeachTests(TestCase):
 
     @requires_gpu
     def test_aliasing(self):
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         def test_foreach_add(a0, a1, a2, b0, b1, b2):
             return torch._foreach_add_([a0, a1, a2], [b0, b1, b2])
 
@@ -1072,8 +1027,6 @@ class ForeachTests(TestCase):
     def test_2d_block_no_mixed_sizes_no_mask(self):
         """2D blocking with no mixed sizes constant mask"""
 
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         def fn(a0, a1, a2, b0, b1, b2):
             return torch._foreach_add([a0, a1, a2], [b0, b1, b2])
 
@@ -1096,8 +1049,6 @@ class ForeachTests(TestCase):
     @config.patch({"combo_kernel_per_subkernel_blocks": True})
     def test_2d_block_mixed_sizes_with_mask(self):
         """2D blocking with mixed sizes should have mask"""
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         from torch._inductor.utils import run_and_get_code
 
         def fn(a0, a1, a2, b0, b1, b2):
@@ -1122,8 +1073,6 @@ class ForeachTests(TestCase):
     @requires_gpu
     @foreach_map_bin_ops
     def test_foreach_map_backward_binary(self, op):
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         from torch._dynamo.polyfills import foreach_map_fn
 
         def fn(xs, ys):
@@ -1433,8 +1382,6 @@ class ForeachTests(TestCase):
     @requires_gpu
     @foreach_map_un_ops
     def test_foreach_map_backward_unary(self, op):
-        if torch.npu.is_available():
-            self.skipTest('inductor不支持NPU FOREACH分组融合')
         from torch._dynamo.polyfills import foreach_map_fn
 
         def fn(xs):
