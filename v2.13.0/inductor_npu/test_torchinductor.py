@@ -18172,7 +18172,6 @@ def forward(self, arg0_1: "Sym(s77)", arg1_1: "Sym(s27)", arg2_1: "Sym(s53)", ar
         )
 
     @config.patch(combo_kernels=True)
-    @unittest.skip("NPU does not support")
     def test_combo_kernel_filter_cpu(self):
         def fn(a, b, c, d):
             a = a * 4
@@ -18196,13 +18195,12 @@ def forward(self, arg0_1: "Sym(s77)", arg1_1: "Sym(s27)", arg2_1: "Sym(s53)", ar
         if self.device.lower() == "cpu":
             self.assertEqual(torch._inductor.metrics.generated_kernel_count, 4)
 
-        if self.device.lower() == "cuda":
+        if torch.device(self.device).type in ("cuda", "npu"):
             self.assertEqual(torch._inductor.metrics.generated_kernel_count, 2)
 
     #@requires_gpu_and_triton
     @config.patch(combo_kernels=True)
     @torch._dynamo.config.patch(assume_static_by_default=False)
-    @unittest.skip("NPU does not support")
     def test_combo_kernel_store_mask(self):
         def fn(x):
             return (

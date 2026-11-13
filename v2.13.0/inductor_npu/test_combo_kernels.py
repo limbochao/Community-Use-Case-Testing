@@ -43,6 +43,11 @@ from torch.testing._internal.triton_utils import (
 
 aten = torch.ops.aten
 
+NPU_PDL_REASON = (
+    "CUDA-only PDL requires NVIDIA SM90+ hardware and "
+    "CUDA grid-dependency-control launch/synchronization intrinsics"
+)
+
 try:
     try:
         from .test_torchinductor import check_model, check_model_gpu
@@ -246,8 +251,8 @@ class ComboKernelTests(TestCase):
 
     @requires_cuda_and_triton
     @unittest.skipIf(
-        not SM90OrLater or torch.version.hip,
-        "TMA requires SM90 or later (Hopper+), not supported on ROCm",
+        GPU_TYPE == "npu" or not SM90OrLater or torch.version.hip,
+        "CUDA-only TMA descriptors require SM90+ Tensor Memory Accelerator hardware",
     )
     @torch._inductor.config.patch(
         {
@@ -1435,6 +1440,7 @@ class ComboKernelPDLTests(TestCase):
     @requires_gpu_and_triton
     @skipIfRocm
     @unittest.skipIf(not SM90OrLater, "PDL requires SM90 or later (Hopper+)")
+    @unittest.skipIf(GPU_TYPE == "npu", NPU_PDL_REASON)
     def test_pdl_codegen_in_combo_kernel(self):
         """Test that PDL flag and gdc calls are generated in combo kernels."""
 
@@ -1475,6 +1481,7 @@ class ComboKernelPDLTests(TestCase):
     @requires_gpu_and_triton
     @skipIfRocm
     @unittest.skipIf(not SM90OrLater, "PDL requires SM90 or later (Hopper+)")
+    @unittest.skipIf(GPU_TYPE == "npu", NPU_PDL_REASON)
     def test_pdl_combo_kernel_pointwise(self):
         """Test that pointwise combo kernels produce correct results with PDL."""
 
@@ -1518,6 +1525,7 @@ class ComboKernelPDLTests(TestCase):
     @requires_gpu_and_triton
     @skipIfRocm
     @unittest.skipIf(not SM90OrLater, "PDL requires SM90 or later (Hopper+)")
+    @unittest.skipIf(GPU_TYPE == "npu", NPU_PDL_REASON)
     def test_pdl_combo_kernel_reduction(self):
         """Test that reduction combo kernels produce correct results with PDL."""
 

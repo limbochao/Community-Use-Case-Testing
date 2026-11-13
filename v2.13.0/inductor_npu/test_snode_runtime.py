@@ -3,6 +3,7 @@ import torch_npu
 from torch_npu.contrib import transfer_to_npu
 from torch_npu.utils import _dynamo
 _dynamo.use_jit_script = True
+_dynamo.patch_has_triton()
 torch.cuda.get_device_capability = lambda :(10, 0)
 import torch_npu.testing
 
@@ -301,7 +302,6 @@ class InputDistanceTests(TestCase):
         self.assertEqual(min(all_min), 0)
         self.assertEqual(max(all_max), 1)
 
-    @unittest.skip("NPU does not support")
     def test_foreach_basic(self):
         """
         foreach_add on graph inputs should have depth 0.
@@ -313,11 +313,11 @@ class InputDistanceTests(TestCase):
         xs = [T(10), T(20)]
         ys = [T(10), T(20)]
         snodes = self._get_snodes(f, xs, ys)
+        self.assertTrue(snodes, "Expected scheduler nodes for the input-distance checks")
         for s in snodes:
             self.assertEqual(s.min_input_distance, 0)
             self.assertEqual(s.max_input_distance, 0)
 
-    @unittest.skip("NPU does not support")
     def test_foreach_after_extern(self):
         """
         mm (extern, depth 0) -> foreach_add (depth 1)
@@ -330,6 +330,7 @@ class InputDistanceTests(TestCase):
             return torch._foreach_add([c, c], ys)
 
         snodes = self._get_snodes(f, T(10, 10), T(10, 10), [T(10, 10), T(10, 10)])
+        self.assertTrue(snodes, "Expected scheduler nodes for the input-distance checks")
         all_min = [s.min_input_distance for s in snodes]
         all_max = [s.max_input_distance for s in snodes]
         self.assertEqual(min(all_min), 0)
