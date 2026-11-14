@@ -37,7 +37,6 @@ from torch.testing._internal.inductor_utils import GPU_TYPE, HAS_CPU, HAS_GPU_AN
 from torch.testing._internal.triton_utils import (
     requires_cuda_and_triton,
     requires_gpu_and_triton,
-    requires_xpu_and_triton,
 )
 
 
@@ -1354,7 +1353,7 @@ class ComboKernelDynamicShapesTests(TestCase):
 
         self.assertEqual(out_eager, out_compiled)
 
-    @requires_xpu_and_triton
+    @requires_gpu_and_triton
     @torch._dynamo.config.patch("automatic_dynamic_shapes", True)
     @torch._dynamo.config.patch("assume_static_by_default", True)
     @torch._inductor.config.patch("triton.autotune_at_compile_time", True)
